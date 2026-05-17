@@ -134,6 +134,121 @@ GO_API_BASE=http://localhost:3001 npm start
 
 In production, run both processes behind a reverse proxy or process manager. Route user traffic to the Next.js app and make sure `/api/*` reaches the Go backend.
 
+## Auto-Start After Reboot With Systemd
+
+Systemd is the recommended option for a Linux server because it starts services on boot, restarts crashed processes, captures logs with `journalctl`, and does not require a separate Node process manager.
+
+Service templates are provided in:
+
+```text
+deploy/systemd/
+├── roster-api.service.example
+├── roster-api.env.example
+├── roster-web.service.example
+└── roster-web.env.example
+```
+
+The templates assume this production layout:
+
+| Path | Purpose |
+|---|---|
+| `/opt/roster-dashboard` | Deployed project directory |
+| `/opt/roster-dashboard/bin/roster-api` | Built Go backend binary |
+| `/opt/roster-dashboard/frontend` | Built Next.js frontend |
+| `/etc/roster-dashboard` | Environment files |
+| `/var/lib/roster-dashboard/roster.db` | SQLite database |
+| `roster` | Linux user/group running the services |
+
+Edit the `.service` and `.env` files if your server uses different paths, ports, or user names.
+
+### 1. Build The App
+
+From the project root:
+
+```bash
+go build -o bin/roster-api ./cmd/server
+
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+### 2. Copy Files To The Server Layout
+
+Example:
+
+```bash
+sudo useradd --system --home /opt/roster-dashboard --shell /usr/sbin/nologin roster
+sudo mkdir -p /opt/roster-dashboard /etc/roster-dashboard /var/lib/roster-dashboard
+sudo cp -R . /opt/roster-dashboard
+sudo chown -R roster:roster /opt/roster-dashboard /var/lib/roster-dashboard
+```
+
+If you already have a database, copy it to the path you choose for `DB_PATH`.
+
+### 3. Install Environment Files
+
+```bash
+sudo cp deploy/systemd/roster-api.env.example /etc/roster-dashboard/roster-api.env
+sudo cp deploy/systemd/roster-web.env.example /etc/roster-dashboard/roster-web.env
+```
+
+Then edit both files:
+
+```bash
+sudo nano /etc/roster-dashboard/roster-api.env
+sudo nano /etc/roster-dashboard/roster-web.env
+```
+
+At minimum, replace `SESSION_SECRET` with a strong random value:
+
+```bash
+openssl rand -hex 32
+```
+
+### 4. Install Systemd Units
+
+```bash
+sudo cp deploy/systemd/roster-api.service.example /etc/systemd/system/roster-api.service
+sudo cp deploy/systemd/roster-web.service.example /etc/systemd/system/roster-web.service
+sudo systemctl daemon-reload
+```
+
+### 5. Enable And Start
+
+```bash
+sudo systemctl enable --now roster-api
+sudo systemctl enable --now roster-web
+```
+
+Check status:
+
+```bash
+sudo systemctl status roster-api
+sudo systemctl status roster-web
+```
+
+View logs:
+
+```bash
+journalctl -u roster-api -f
+journalctl -u roster-web -f
+```
+
+Restart after changes:
+
+```bash
+sudo systemctl restart roster-api
+sudo systemctl restart roster-web
+```
+
+### Other Viable Options
+
+- **Docker Compose**: good if you want repeatable deployments and isolated runtime versions.
+- **PM2**: works well for the Next.js frontend, but it does not manage the Go backend as naturally as systemd.
+- **Supervisor**: simple process supervision, but systemd is usually already available on modern Linux servers.
+
 ## Environment Variables
 
 | Variable | Default | Used by | Description |

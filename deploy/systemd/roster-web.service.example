@@ -1,0 +1,20 @@
+[Unit]
+Description=Roster Dashboard Next.js Frontend
+After=network-online.target roster-api.service
+Wants=network-online.target
+Requires=roster-api.service
+
+[Service]
+Type=simple
+User=roster
+Group=roster
+WorkingDirectory=/opt/roster-dashboard/frontend
+EnvironmentFile=/etc/roster-dashboard/roster-web.env
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Roster Dashboard Go API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=roster
+Group=roster
+WorkingDirectory=/opt/roster-dashboard
+EnvironmentFile=/etc/roster-dashboard/roster-api.env
+ExecStart=/opt/roster-dashboard/bin/roster-api
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

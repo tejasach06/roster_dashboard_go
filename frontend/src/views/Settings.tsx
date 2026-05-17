@@ -185,7 +185,6 @@ export default function Settings() {
           templateRows={[
             ['name', 'emp_code', 'job_title', 'email', 'phone'],
             ['Alice Johnson', 'STPL1001', 'Support Engineer', 'alice@example.com', '9876543210'],
-            ['Bob Smith',     'STPL1002', 'Senior Engineer',  'bob@example.com',   ''],
           ]}
           columns={['Name', 'Emp_Code', 'Job_Title', 'Email', 'Phone']}
           parseRows={(rows) => rows.filter((r) => r.name?.trim())}
@@ -199,7 +198,6 @@ export default function Settings() {
           templateRows={[
             ['name', 'username', 'password', 'role', 'team_name'],
             ['Alice Johnson', 'alice', 'changeme123', 'member', 'Support Alpha'],
-            ['Bob Smith',     'bob',   'changeme123', 'admin',  ''],
           ]}
           columns={['Name', 'Username', 'Password', 'Role', 'Team_Name']}
           parseRows={(rows) => rows.filter((r) => r.name?.trim() && r.username?.trim() && r.password?.trim())}
@@ -212,12 +210,10 @@ export default function Settings() {
           templateFile="roster_template.csv"
           templateRows={(() => {
             const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
-            const r1 = ['GS','AS','AS','WO','NS','NS','WO','WO','AS','AS','WO','WO','NS','NS','NS','NS','NS','NS','WO','WO','MS','MS','WO','AS','WO','WO','WO','EL','EL','EL','EL'];
-            const r2 = ['WO','MS','MS','WO','MS','WO','NS','NS','NS','NS','NS','NS','WO','AS','WO','WO','WO','AS','NS','NS','WO','WO','AS','WO','MS','MS','MS','MS','WO','AS','AS'];
+            const shifts = ['GS', 'AS', 'AS', ...Array.from({ length: 28 }, () => '')];
             return [
               ['name', 'emp_code', 'team_name', 'month', ...days],
-              ['Aditya', 'STPL1206', 'Support Alpha', '2026-05', ...r1],
-              ['Narendra', 'STPL1676', 'Support Alpha', '2026-05', ...r2],
+              ['Aditya', 'STPL1206', 'Support Alpha', '2026-05', ...shifts],
             ];
           })()}
           columns={['Emp_Code', 'Date', 'Shift_Code', 'Team_Name']}

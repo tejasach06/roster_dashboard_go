@@ -833,36 +833,55 @@ func (s *Store) ImportUsers(rows []map[string]any) app.ImportResult {
 func (s *Store) ImportRoster(rows []map[string]any) app.ImportResult {
 	result := app.ImportResult{}
 	for _, row := range rows {
-		empCode, date, shiftCode, teamName := trim(row["emp_code"]), trim(row["date"]), strings.ToUpper(trim(row["shift_code"])), trim(row["team_name"])
-		if empCode == "" || date == "" || shiftCode == "" || teamName == "" {
-			result.Errors = append(result.Errors, "Missing fields in row")
+		if trim(row["date"]) == "" && trim(row["shift_code"]) == "" && trim(row["month"]) != "" {
+			for day := 1; day <= 31; day++ {
+				shiftCode := strings.ToUpper(trim(row[fmt.Sprintf("%d", day)]))
+				if shiftCode == "" {
+					continue
+				}
+				s.importRosterRow(map[string]any{
+					"emp_code":   row["emp_code"],
+					"date":       fmt.Sprintf("%s-%02d", trim(row["month"]), day),
+					"shift_code": shiftCode,
+					"team_name":  row["team_name"],
+				}, &result)
+			}
 			continue
 		}
-		if !app.ValidShift(shiftCode) {
-			result.Errors = append(result.Errors, fmt.Sprintf(`Invalid shift_code "%s" (%s %s)`, shiftCode, empCode, date))
-			continue
-		}
-		if !app.ValidDate(date) {
-			result.Errors = append(result.Errors, fmt.Sprintf(`Invalid date "%s" for %s`, date, empCode))
-			continue
-		}
-		var employeeID, teamID int64
-		if err := s.DB.QueryRow(`SELECT id FROM employees WHERE emp_code = ?`, empCode).Scan(&employeeID); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf(`Employee not found: emp_code "%s"`, empCode))
-			continue
-		}
-		if err := s.DB.QueryRow(`SELECT id FROM teams WHERE name = ?`, teamName).Scan(&teamID); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf(`Team not found: "%s"`, teamName))
-			continue
-		}
-		if _, err := s.UpsertRosterEntry(employeeID, teamID, shiftCode, date, "", true); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("Failed to import row (%s %s)", empCode, date))
-		} else {
-			result.Imported++
-		}
+		s.importRosterRow(row, &result)
 	}
 	if len(result.Errors) > 30 {
 		result.Errors = result.Errors[:30]
 	}
 	return result
+}
+
+func (s *Store) importRosterRow(row map[string]any, result *app.ImportResult) {
+	empCode, date, shiftCode, teamName := trim(row["emp_code"]), trim(row["date"]), strings.ToUpper(trim(row["shift_code"])), trim(row["team_name"])
+	if empCode == "" || date == "" || shiftCode == "" || teamName == "" {
+		result.Errors = append(result.Errors, "Missing fields in row")
+		return
+	}
+	if !app.ValidShift(shiftCode) {
+		result.Errors = append(result.Errors, fmt.Sprintf(`Invalid shift_code "%s" (%s %s)`, shiftCode, empCode, date))
+		return
+	}
+	if !app.ValidDate(date) {
+		result.Errors = append(result.Errors, fmt.Sprintf(`Invalid date "%s" for %s`, date, empCode))
+		return
+	}
+	var employeeID, teamID int64
+	if err := s.DB.QueryRow(`SELECT id FROM employees WHERE emp_code = ?`, empCode).Scan(&employeeID); err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf(`Employee not found: emp_code "%s"`, empCode))
+		return
+	}
+	if err := s.DB.QueryRow(`SELECT id FROM teams WHERE name = ?`, teamName).Scan(&teamID); err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf(`Team not found: "%s"`, teamName))
+		return
+	}
+	if _, err := s.UpsertRosterEntry(employeeID, teamID, shiftCode, date, "", true); err != nil {
+		result.Errors = append(result.Errors, fmt.Sprintf("Failed to import row (%s %s)", empCode, date))
+	} else {
+		result.Imported++
+	}
 }

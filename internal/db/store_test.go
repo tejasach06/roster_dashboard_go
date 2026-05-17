@@ -106,6 +106,10 @@ func TestImports(t *testing.T) {
 	if roster.Imported != 1 {
 		t.Fatalf("roster import: %#v", roster)
 	}
+	gridRoster := store.ImportRoster([]map[string]any{{"name": "Alice", "emp_code": "A1", "team_name": team.Name, "month": "2026-05", "1": "GS", "2": "AS", "3": ""}})
+	if gridRoster.Imported != 2 {
+		t.Fatalf("grid roster import: %#v", gridRoster)
+	}
 	stats, err := store.RosterStats(app.User{ID: 1, Role: "admin"}, "2026-05")
 	if err != nil || len(stats) == 0 {
 		t.Fatalf("stats len=%d err=%v", len(stats), err)

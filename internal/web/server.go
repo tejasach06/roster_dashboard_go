@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"roster_dashboard_go/internal/app"
@@ -22,18 +24,42 @@ import (
 var embedded embed.FS
 
 type Server struct {
-	store  *db.Store
-	secret string
-	mux    *http.ServeMux
+	store         *db.Store
+	secret        string
+	mux           *http.ServeMux
+	secureCookies bool
+	loginLimiter  *rateLimiter
+	apiLimiter    *rateLimiter
 }
 
 func New(store *db.Store, secret string) *Server {
-	s := &Server{store: store, secret: secret, mux: http.NewServeMux()}
+	s := &Server{
+		store:         store,
+		secret:        secret,
+		mux:           http.NewServeMux(),
+		secureCookies: strings.EqualFold(os.Getenv("APP_ENV"), "production"),
+		loginLimiter:  newRateLimiter(10, 15*time.Minute),
+		apiLimiter:    newRateLimiter(200, time.Minute),
+	}
 	s.routes()
 	return s
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w)
+	if r.Body != nil && (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) {
+		r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		limiter := s.apiLimiter
+		if r.Method == http.MethodPost && r.URL.Path == "/api/auth/login" {
+			limiter = s.loginLimiter
+		}
+		if !limiter.allow(clientIP(r)) {
+			writeError(w, http.StatusTooManyRequests, "Too many requests")
+			return
+		}
+	}
 	s.mux.ServeHTTP(w, r)
 }
 
@@ -58,6 +84,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /actions/roster/remove-employee", s.requireUser(s.rosterRemoveEmployeeAction))
 
 	s.mux.HandleFunc("POST /api/auth/login", s.apiLogin)
+	s.mux.HandleFunc("POST /api/auth/logout", s.apiLogout)
 	s.mux.HandleFunc("GET /api/auth/me", s.requireAPIUser(s.apiMe))
 	s.mux.HandleFunc("GET /api/teams", s.requireAPIUser(s.apiTeams))
 	s.mux.HandleFunc("POST /api/teams", s.requireAPIAdmin(s.apiCreateTeam))
@@ -160,14 +187,23 @@ func (s *Server) setSession(w http.ResponseWriter, user app.User) (string, error
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   s.secureCookies,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int((8 * time.Hour).Seconds()),
 	})
 	return token, nil
 }
 
-func clearSession(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+func (s *Server) clearSession(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data any) {
@@ -202,6 +238,54 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func setSecurityHeaders(w http.ResponseWriter) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+type rateLimiter struct {
+	mu      sync.Mutex
+	limit   int
+	window  time.Duration
+	buckets map[string]rateBucket
+}
+
+type rateBucket struct {
+	start time.Time
+	count int
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{limit: limit, window: window, buckets: map[string]rateBucket{}}
+}
+
+func (l *rateLimiter) allow(key string) bool {
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	bucket := l.buckets[key]
+	if bucket.start.IsZero() || now.Sub(bucket.start) > l.window {
+		l.buckets[key] = rateBucket{start: now, count: 1}
+		return true
+	}
+	if bucket.count >= l.limit {
+		return false
+	}
+	bucket.count++
+	l.buckets[key] = bucket
+	return true
 }
 
 func idParam(r *http.Request, key string) (int64, error) {

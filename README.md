@@ -6,8 +6,8 @@ The backend is a Go JSON API backed by SQLite. The frontend is a Next.js app por
 
 ## Prerequisites
 
-- Go 1.22+
-- Node.js 18+ or 20+
+- Go 1.26.3+
+- Node.js 20.9+
 - npm
 
 ## Project Layout
@@ -44,13 +44,15 @@ PORT=3001 \
 go run ./cmd/server
 ```
 
-The backend creates missing tables and seeds the default admin only when no `admin` user exists.
+The backend creates missing tables and seeds the first admin only when no admin user exists.
 
-Default credentials:
+Development-only default credentials:
 
 | Username | Password |
 |---|---|
 | `admin` | `admin123` |
+
+In production, the backend will not use the default password. Set `INITIAL_ADMIN_PASSWORD` before the first production start.
 
 ### 2. Start The Frontend
 
@@ -100,6 +102,46 @@ curl -i -X POST http://localhost:3001/api/auth/login \
   -d '{"username":"admin","password":"admin123"}'
 ```
 
+## CSV Bulk Upload
+
+CSV bulk upload is available to admin users from:
+
+```text
+Settings → Import Employees / Import Users / Import Roster
+```
+
+Each import card lets you download a CSV template, upload a filled CSV file, preview the parsed rows, and submit the import.
+
+Employee CSV:
+
+```csv
+name,emp_code,job_title,email,phone
+Alice Johnson,STPL1001,Support Engineer,alice@example.com,9876543210
+```
+
+User CSV:
+
+```csv
+name,username,password,role,team_name
+Alice Johnson,alice,changeme123,member,Support Alpha
+```
+
+Roster CSV uses the original grid format:
+
+```csv
+name,emp_code,team_name,month,1,2,3,...,31
+Aditya,STPL1206,Support Alpha,2026-05,GS,AS,AS,...
+```
+
+Rules:
+
+- User `role` must be `admin` or `member`.
+- User passwords must be at least 8 characters.
+- `team_name` must match an existing team exactly.
+- Roster `emp_code` must match an existing employee.
+- Roster shift codes must be one of `MS`, `GS`, `AS`, `NS`, `WO`, `EL`.
+- Blank roster day cells are skipped.
+
 ## Production
 
 Build the backend:
@@ -121,6 +163,7 @@ Run the backend:
 APP_ENV=production \
 DB_PATH=/path/to/roster.db \
 SESSION_SECRET=<strong-random-secret> \
+INITIAL_ADMIN_PASSWORD=<first-admin-password> \
 PORT=3001 \
 ./bin/roster-api
 ```
@@ -201,7 +244,7 @@ sudo nano /etc/roster-dashboard/roster-api.env
 sudo nano /etc/roster-dashboard/roster-web.env
 ```
 
-At minimum, replace `SESSION_SECRET` with a strong random value:
+At minimum, replace `SESSION_SECRET` and `INITIAL_ADMIN_PASSWORD` before the first production start. Production rejects signing secrets shorter than 32 characters. Generate a strong session secret with:
 
 ```bash
 openssl rand -hex 32
@@ -255,14 +298,17 @@ sudo systemctl restart roster-web
 |---|---|---|---|
 | `PORT` | `3001` | Backend | HTTP listen port |
 | `DB_PATH` | `./roster.db` | Backend | SQLite database path |
-| `SESSION_SECRET` | development fallback | Backend | HS256 token/session signing secret |
+| `SESSION_SECRET` | development fallback | Backend | HS256 token/session signing secret; at least 32 characters in production |
 | `JWT_SECRET` | optional | Backend | Used if `SESSION_SECRET` is unset |
 | `APP_ENV` | `development` | Backend | Set to `production` to require a real secret |
+| `INITIAL_ADMIN_USERNAME` | `admin` | Backend | Username used only when seeding the first admin |
+| `INITIAL_ADMIN_NAME` | `Admin` | Backend | Display name used only when seeding the first admin |
+| `INITIAL_ADMIN_PASSWORD` | `admin123` in development, required in production | Backend | Password used only when seeding the first admin |
 | `GO_API_BASE` | `http://localhost:3001` | Frontend | Backend URL used by Next.js rewrites |
 
 ## Notes
 
 - API routes are exposed under `/api`.
-- `/api/auth/login` returns the Bearer token and user payload expected by the frontend.
+- `/api/auth/login` sets an HttpOnly session cookie and returns the user payload. It also returns a Bearer token for API compatibility, but the frontend does not store it.
 - The Next.js UI includes the dashboard, roster grid, admin panel, settings, dark mode, and CSV import workflows.
 - SQLite is a single-writer database; keep backend deployment to one process unless you intentionally design around that limit.

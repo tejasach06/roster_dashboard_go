@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -112,11 +113,29 @@ func (s *Store) seedAdmin() error {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte("admin123"), 10)
+	username := strings.TrimSpace(os.Getenv("INITIAL_ADMIN_USERNAME"))
+	if username == "" {
+		username = "admin"
+	}
+	name := strings.TrimSpace(os.Getenv("INITIAL_ADMIN_NAME"))
+	if name == "" {
+		name = "Admin"
+	}
+	password := os.Getenv("INITIAL_ADMIN_PASSWORD")
+	if password == "" {
+		if strings.EqualFold(os.Getenv("APP_ENV"), "production") {
+			return fmt.Errorf("INITIAL_ADMIN_PASSWORD must be set when seeding the first admin in production")
+		}
+		password = "admin123"
+	}
+	if len(password) < 8 {
+		return fmt.Errorf("INITIAL_ADMIN_PASSWORD must be at least 8 characters")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.Exec(`INSERT INTO users (name, username, password_hash, role) VALUES (?, ?, ?, 'admin')`, "Admin", "admin", string(hash))
+	_, err = s.DB.Exec(`INSERT INTO users (name, username, password_hash, role) VALUES (?, ?, ?, 'admin')`, name, username, string(hash))
 	return err
 }
 
@@ -741,19 +760,31 @@ func (s *Store) ImportEmployees(rows []map[string]any) app.ImportResult {
 			result.Skipped++
 			continue
 		}
-		res, err := s.DB.Exec(`INSERT OR IGNORE INTO employees (name, emp_code, job_title, email, phone) VALUES (?, ?, ?, ?, ?)`,
-			name, trim(row["emp_code"]), trim(row["job_title"]), trim(row["email"]), trim(row["phone"]))
+		empCode := trim(row["emp_code"])
+		var existing int64
+		var err error
+		if empCode != "" {
+			err = s.DB.QueryRow(`SELECT id FROM employees WHERE emp_code = ? OR name = ? LIMIT 1`, empCode, name).Scan(&existing)
+		} else {
+			err = s.DB.QueryRow(`SELECT id FROM employees WHERE name = ? LIMIT 1`, name).Scan(&existing)
+		}
+		if err == nil {
+			result.Skipped++
+			continue
+		}
+		if err != sql.ErrNoRows {
+			result.Errors = append(result.Errors, "Failed to check employee "+name)
+			result.Skipped++
+			continue
+		}
+		_, err = s.DB.Exec(`INSERT INTO employees (name, emp_code, job_title, email, phone) VALUES (?, ?, ?, ?, ?)`,
+			name, empCode, trim(row["job_title"]), trim(row["email"]), trim(row["phone"]))
 		if err != nil {
 			result.Errors = append(result.Errors, "Failed to import employee "+name)
 			result.Skipped++
 			continue
 		}
-		changes, _ := res.RowsAffected()
-		if changes > 0 {
-			result.Created++
-		} else {
-			result.Skipped++
-		}
+		result.Created++
 	}
 	return result
 }

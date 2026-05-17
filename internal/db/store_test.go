@@ -17,6 +17,32 @@ func newTestStore(t *testing.T) *Store {
 	return store
 }
 
+func TestProductionSeedAdminRequiresConfiguredPassword(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("INITIAL_ADMIN_PASSWORD", "")
+
+	store, err := Open(filepath.Join(t.TempDir(), "roster.db"))
+	if err == nil {
+		_ = store.Close()
+		t.Fatal("expected production seed without password to fail")
+	}
+}
+
+func TestSeedAdminCanUseConfiguredCredentials(t *testing.T) {
+	t.Setenv("INITIAL_ADMIN_USERNAME", "owner")
+	t.Setenv("INITIAL_ADMIN_NAME", "Owner")
+	t.Setenv("INITIAL_ADMIN_PASSWORD", "configured123")
+
+	store := newTestStore(t)
+	user, err := store.Authenticate("owner", "configured123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.Name != "Owner" || user.Role != "admin" {
+		t.Fatalf("seeded user mismatch: %#v", user)
+	}
+}
+
 func TestSeedAdminAndTeamScopedLists(t *testing.T) {
 	store := newTestStore(t)
 	admin, err := store.Authenticate("admin", "admin123")
@@ -71,6 +97,10 @@ func TestImports(t *testing.T) {
 	employees := store.ImportEmployees([]map[string]any{{"name": "Alice", "emp_code": "A1"}})
 	if employees.Created != 1 {
 		t.Fatalf("employees import: %#v", employees)
+	}
+	employees = store.ImportEmployees([]map[string]any{{"name": "Alice", "emp_code": "A1"}})
+	if employees.Created != 0 || employees.Skipped != 1 {
+		t.Fatalf("duplicate employees import: %#v", employees)
 	}
 	roster := store.ImportRoster([]map[string]any{{"emp_code": "A1", "date": "2026-05-01", "shift_code": "MS", "team_name": team.Name}})
 	if roster.Imported != 1 {

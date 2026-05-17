@@ -30,4 +30,10 @@ func TestProductionSecretRequired(t *testing.T) {
 	if _, err := SecretFromEnv("", "", "production"); err == nil {
 		t.Fatal("expected production default secret rejection")
 	}
+	if _, err := SecretFromEnv("short-secret", "", "production"); err == nil {
+		t.Fatal("expected short production secret rejection")
+	}
+	if _, err := SecretFromEnv("0123456789abcdef0123456789abcdef", "", "production"); err != nil {
+		t.Fatal(err)
+	}
 }

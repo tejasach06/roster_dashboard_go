@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import api from '../api/client';
 
 export interface User {
   id: number;
@@ -25,24 +26,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('user');
-      setUser(stored ? JSON.parse(stored) : null);
-    } catch {
-      setUser(null);
-    } finally {
-      setReady(true);
-    }
+    let mounted = true;
+    api.get<User>('/auth/me')
+      .then(({ data }) => {
+        if (!mounted) return;
+        setUser(data);
+        localStorage.setItem('user', JSON.stringify(data));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        localStorage.removeItem('user');
+        setUser(null);
+      })
+      .finally(() => {
+        if (mounted) setReady(true);
+      });
+    return () => { mounted = false; };
   }, []);
 
-  const login = (token: string, user: User) => {
-    localStorage.setItem('token', token);
+  const login = (_token: string, user: User) => {
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    void api.post('/auth/logout').catch(() => {});
     localStorage.removeItem('user');
     setUser(null);
   };

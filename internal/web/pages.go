@@ -60,7 +60,7 @@ func (s *Server) loginForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	clearSession(w)
+	s.clearSession(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 

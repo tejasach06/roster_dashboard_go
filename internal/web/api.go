@@ -30,6 +30,11 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"token": token, "user": user})
 }
 
+func (s *Server) apiLogout(w http.ResponseWriter, r *http.Request) {
+	s.clearSession(w)
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
 func (s *Server) apiMe(w http.ResponseWriter, r *http.Request, user app.User) {
 	writeJSON(w, http.StatusOK, user)
 }

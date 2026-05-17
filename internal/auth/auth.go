@@ -84,8 +84,13 @@ func SecretFromEnv(sessionSecret, jwtSecret, env string) (string, error) {
 	if secret == "" {
 		secret = "roster-secret-key-change-in-prod"
 	}
-	if strings.EqualFold(env, "production") && secret == "roster-secret-key-change-in-prod" {
-		return "", fmt.Errorf("SESSION_SECRET or JWT_SECRET must be set in production")
+	if strings.EqualFold(env, "production") {
+		if secret == "roster-secret-key-change-in-prod" {
+			return "", fmt.Errorf("SESSION_SECRET or JWT_SECRET must be set in production")
+		}
+		if len(secret) < 32 {
+			return "", fmt.Errorf("SESSION_SECRET or JWT_SECRET must be at least 32 characters in production")
+		}
 	}
 	return secret, nil
 }

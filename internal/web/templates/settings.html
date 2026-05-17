@@ -1,0 +1,11 @@
+{{define "content"}}
+<section class="page settings-page">
+  <header class="page-header"><div><h1>Settings</h1><p>Bulk import data from CSV text. Download templates from the original app or paste matching CSV here.</p></div></header>
+  {{if .Error}}<div class="banner error">{{.Error}}</div>{{end}}
+  <div class="import-grid">
+    <article class="card import-card" data-import="/api/employees/bulk-import"><h2>Import Employees</h2><p>name, emp_code, job_title, email, phone</p><textarea placeholder="name,emp_code,job_title,email,phone"></textarea><button class="primary-btn" type="button" data-import-run>Import</button><pre></pre></article>
+    <article class="card import-card" data-import="/api/users/bulk-import"><h2>Import Users</h2><p>name, username, password, role, team_name</p><textarea placeholder="name,username,password,role,team_name"></textarea><button class="primary-btn" type="button" data-import-run>Import</button><pre></pre></article>
+    <article class="card import-card" data-import="/api/roster/bulk-import"><h2>Import Roster</h2><p>emp_code, date, shift_code, team_name</p><textarea placeholder="emp_code,date,shift_code,team_name"></textarea><button class="primary-btn" type="button" data-import-run>Import</button><pre></pre></article>
+  </div>
+</section>
+{{end}}

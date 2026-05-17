@@ -1,0 +1,70 @@
+{{define "content"}}
+<section class="page">
+  <header class="page-header"><div><h1>Admin Panel</h1><p>Manage employees, teams, and user accounts</p></div></header>
+  {{if .Error}}<div class="banner error">{{.Error}}</div>{{end}}
+  <div class="tabs">
+    <button class="tab active" data-tab="employees" type="button">Employees</button>
+    <button class="tab" data-tab="teams" type="button">Teams</button>
+    <button class="tab" data-tab="users" type="button">Users</button>
+  </div>
+
+  <section class="tab-panel active" id="employees">
+    <div class="card">
+      <div class="card-head"><h2>{{len .Employees}} employees</h2><button class="soft-btn" data-modal-open="employee-modal" type="button">Add employee</button></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Name</th><th>Emp Code</th><th>Job Title</th><th>Team</th><th>Contact</th><th></th></tr></thead><tbody>
+        {{range .Employees}}<tr>
+          <td><strong>{{.Name}}</strong></td><td>{{.EmpCode}}</td><td>{{.JobTitle}}</td><td>{{.TeamName}}</td><td>{{.Email}} {{.Phone}}</td>
+          <td class="actions">
+            <button class="text-link" data-fill-form="employee-modal" data-id="{{.ID}}" data-name="{{.Name}}" data-emp_code="{{.EmpCode}}" data-job_title="{{.JobTitle}}" data-email="{{.Email}}" data-phone="{{.Phone}}" data-team_id="{{with .TeamID}}{{.}}{{end}}" type="button">Edit</button>
+            <form method="post" action="/actions/employees"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{.ID}}"><button class="danger-link" type="submit">Delete</button></form>
+          </td>
+        </tr>{{end}}
+        </tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="teams">
+    <div class="card">
+      <div class="card-head"><h2>{{len .Teams}} teams</h2><button class="soft-btn" data-modal-open="team-modal" type="button">Add team</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Description</th><th>Roster Entries</th><th></th></tr></thead><tbody>
+      {{range .Teams}}<tr><td><strong>{{.Name}}</strong></td><td>{{.Description}}</td><td>{{.MemberCount}}</td><td class="actions">
+        <button class="text-link" data-fill-form="team-modal" data-id="{{.ID}}" data-name="{{.Name}}" data-description="{{.Description}}" type="button">Edit</button>
+        <form method="post" action="/actions/teams"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{.ID}}"><button class="danger-link" type="submit">Delete</button></form>
+      </td></tr>{{end}}
+      </tbody></table></div>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="users">
+    <div class="card">
+      <div class="card-head"><h2>{{len .Users}} users</h2><button class="soft-btn" data-modal-open="user-modal" type="button">Add user</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Team</th><th>Role</th><th></th></tr></thead><tbody>
+      {{range .Users}}<tr><td><strong>{{.Name}}</strong></td><td>{{.Username}}</td><td>{{.TeamName}}</td><td>{{.Role}}</td><td class="actions">
+        <button class="text-link" data-fill-form="user-modal" data-id="{{.ID}}" data-name="{{.Name}}" data-username="{{.Username}}" data-role="{{.Role}}" data-team_id="{{with .TeamID}}{{.}}{{end}}" type="button">Edit</button>
+        <form method="post" action="/actions/users"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="{{.ID}}"><button class="danger-link" type="submit">Delete</button></form>
+      </td></tr>{{end}}
+      </tbody></table></div>
+    </div>
+  </section>
+
+  <dialog id="employee-modal" class="modal"><form method="post" action="/actions/employees" class="stack">
+    <button class="close" type="button" data-modal-close>×</button><h2>Employee</h2><input type="hidden" name="id">
+    <label>Name<input name="name" required></label><label>Emp Code<input name="emp_code"></label><label>Job Title<input name="job_title"></label>
+    <label>Team<select name="team_id"><option value="">No team</option>{{range .Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+    <label>Email<input name="email" type="email"></label><label>Phone<input name="phone"></label><button class="primary-btn" type="submit">Save</button>
+  </form></dialog>
+  <dialog id="team-modal" class="modal"><form method="post" action="/actions/teams" class="stack">
+    <button class="close" type="button" data-modal-close>×</button><h2>Team</h2><input type="hidden" name="action" value="save"><input type="hidden" name="id">
+    <label>Name<input name="name" required></label><label>Description<input name="description"></label><button class="primary-btn" type="submit">Save</button>
+  </form></dialog>
+  <dialog id="user-modal" class="modal"><form method="post" action="/actions/users" class="stack">
+    <button class="close" type="button" data-modal-close>×</button><h2>User</h2><input type="hidden" name="action" value="save"><input type="hidden" name="id">
+    <label>Name<input name="name" required></label><label>Username<input name="username" required></label><label>Password<input name="password" type="password" placeholder="Leave blank to keep"></label>
+    <label>Role<select name="role"><option value="member">member</option><option value="admin">admin</option></select></label>
+    <label>Team<select name="team_id"><option value="">No team</option>{{range .Teams}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+    <button class="primary-btn" type="submit">Save</button>
+  </form></dialog>
+</section>
+{{end}}

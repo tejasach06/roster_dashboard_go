@@ -1,0 +1,41 @@
+{{define "layout.html"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Roster Manager</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  {{if .User.ID}}
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="brand-mark">R</span><strong>Roster Manager</strong></div>
+      <nav class="nav">
+        <a href="/" class="nav-link">Dashboard</a>
+        {{if and (not .IsAdmin) .User.TeamID}}<a href="/team/{{with .User.TeamID}}{{.}}{{end}}" class="nav-link">My Team</a>{{end}}
+        {{if .IsAdmin}}<a href="/admin" class="nav-link">Admin Panel</a><a href="/settings" class="nav-link">Settings</a>{{end}}
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-chip"><span>{{printf "%.1s" .User.Name}}</span><div><strong>{{.User.Name}}</strong><small>{{.User.Role}}</small></div></div>
+        <button class="ghost-btn" data-theme-toggle type="button">Toggle theme</button>
+        <form method="post" action="/logout"><button class="ghost-btn full" type="submit">Sign out</button></form>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="mobile-bar">
+        <button class="icon-btn" data-sidebar-toggle type="button">☰</button>
+        <strong>Roster Manager</strong>
+        <button class="icon-btn" data-theme-toggle type="button">◐</button>
+      </div>
+      {{template "content" .}}
+    </main>
+  </div>
+  {{else}}
+    {{template "content" .}}
+  {{end}}
+</body>
+</html>
+{{end}}
